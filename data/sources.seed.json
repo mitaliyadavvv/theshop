@@ -1,0 +1,98 @@
+{
+  "_comment": "Initial brand registry. Loaded into the database once, on first run. After that, manage sources from the Brands page or the /api/sources endpoints — no code changes needed. 'assessment' records what was verified on 2026-10-16. Baaori was removed at the user's request on 2026-10-16.",
+  "sources": [
+    {
+      "id": "just-pals",
+      "name": "Just Pals",
+      "originalUrl": "https://justpals.in/",
+      "sourceType": "website",
+      "assessment": "Shopify. /products.json public (16 products). Prices, images, links, published_at available."
+    },
+    {
+      "id": "be-you-studio",
+      "name": "Be You Studio",
+      "originalUrl": "https://beyoustudio.co.in/",
+      "sourceType": "website",
+      "assessment": "Shopify. /products.json public (17 products)."
+    },
+    {
+      "id": "sundazed",
+      "name": "Sundazed",
+      "originalUrl": "https://sundazed.in/",
+      "sourceType": "website",
+      "assessment": "Shopify. /products.json public (42 products); /collections.json exposes collection publish dates."
+    },
+    {
+      "id": "srvdcold",
+      "name": "SRVDCOLD",
+      "originalUrl": "https://www.instagram.com/srvdcold/",
+      "sourceType": "social",
+      "assessment": "Instagram profile. Not scraped (Instagram terms; no permitted public product feed). Products can be added manually. srvdcold.com exists but returns HTTP 402 (store unavailable) and is not verified as the same brand."
+    },
+    {
+      "id": "butter",
+      "name": "Butter",
+      "originalUrl": "https://shopbutter.net/",
+      "sourceType": "website",
+      "assessment": "Shopify. /products.json public (42 products)."
+    },
+    {
+      "id": "korakagaz-india",
+      "name": "Korakagaz India",
+      "originalUrl": "https://korakagazindia.com/",
+      "sourceType": "website",
+      "assessment": "Shopify. /products.json public (97 products). product_type empty — categories inferred from tags/title."
+    },
+    {
+      "id": "rerunn",
+      "name": "Rerunn",
+      "originalUrl": "https://rerunn.com/",
+      "sourceType": "website",
+      "assessment": "Shopify. /products.json public (125 products)."
+    },
+    {
+      "id": "bisou-by-sachi",
+      "name": "Bisou by Sachi",
+      "originalUrl": "https://bisoubysachi.com/collections/womens",
+      "sourceType": "collection",
+      "scope": "collection",
+      "assessment": "Shopify. /collections/womens/products.json public (58 of 76 store products)."
+    },
+    {
+      "id": "the-rok",
+      "name": "The ROK",
+      "originalUrl": "https://therok.co/",
+      "sourceType": "website",
+      "assessment": "WordPress + WooCommerce. Public Store API /wp-json/wc/store/v1/products (511 products, INR). No publish dates exposed — recency uses first-seen only."
+    },
+    {
+      "id": "wear-chapters",
+      "name": "Wear Chapters",
+      "originalUrl": "https://wearchapters.com/",
+      "sourceType": "website",
+      "assessment": "Shopify. /products.json public (79 products)."
+    },
+    {
+      "id": "noises-india",
+      "name": "Noises India",
+      "originalUrl": "https://noisesindia.com/",
+      "sourceType": "website",
+      "assessment": "Shopify. /products.json public (37 products)."
+    },
+    {
+      "id": "basata",
+      "name": "Basata",
+      "originalUrl": "https://www.basata.co.in/",
+      "sourceType": "website",
+      "assessment": "Shopify. /products.json public (231 products)."
+    },
+    {
+      "id": "jimbhi",
+      "name": "JimBhi",
+      "originalUrl": "https://jimbhi.in/collections/tops",
+      "sourceType": "collection",
+      "scope": "collection",
+      "assessment": "Shopify. /collections/tops/products.json public (36 of 51 store products)."
+    }
+  ]
+}

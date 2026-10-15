@@ -1,0 +1,17 @@
+node_modules
+.next
+.vercel
+next-env.d.ts
+*.tsbuildinfo
+# local data & backups (may contain imported catalogue data)
+data/*.db
+data/*.db-*
+backups/
+# secrets
+.env
+.env.local
+.env*.local
+.claude/
+
+# macOS
+.DS_Store

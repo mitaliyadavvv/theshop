@@ -1,0 +1,41 @@
+{
+  "name": "the-shop",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "next dev -p 3100",
+    "build": "next build",
+    "start": "next start -p 3100",
+    "typecheck": "tsc --noEmit",
+    "sync": "tsx --conditions=react-server scripts/sync.ts",
+    "test": "tsx --conditions=react-server --test tests/*.test.ts",
+    "reindex": "tsx --conditions=react-server scripts/reindex.ts",
+    "demo:seed": "tsx --conditions=react-server scripts/demo-seed.ts",
+    "db:migrate": "tsx scripts/db-migrate.ts",
+    "db:import-sqlite": "tsx scripts/import-sqlite.ts",
+    "seed:owner": "tsx scripts/seed-owner.ts",
+    "e2e": "tsx scripts/e2e-multiuser.ts"
+  },
+  "dependencies": {
+    "@supabase/ssr": "^0.12.7",
+    "@supabase/supabase-js": "^2.118.0",
+    "next": "^16.4.1",
+    "postgres": "^3.4.9",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "server-only": "^0.0.1"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "^0.5.10",
+    "@electric-sql/pglite-socket": "^0.2.13",
+    "@types/node": "^24.19.2",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "tsx": "^4.23.15",
+    "typescript": "^5.9.3"
+  },
+  "engines": {
+    "node": ">=22.5"
+  }
+}
