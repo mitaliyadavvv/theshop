@@ -14,6 +14,7 @@ import { supabaseBrowser } from "@/lib/supabase/client";
 const NAV = [
   { href: "/", label: "Discover" },
   { href: "/new", label: "New drops" },
+  { href: "/colours", label: "Colours" },
   { href: "/brands", label: "Brands" },
 ];
 
