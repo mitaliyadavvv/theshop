@@ -236,6 +236,37 @@ describe("abuse protection", () => {
   });
 });
 
+describe("brand mixing in the feed (signed-in pagination)", () => {
+  test("paging through everything: every product exactly once, mixed while several brands remain", async () => {
+    const D = await createUser(pg, "d@example.com");
+    // Two batch-published brands: 12 newest from one, then 8 from the other.
+    await importedSource("https://mix-one.test/", Array.from({ length: 12 }, (_, i) => product(`m1-${i}`, `One Top ${i}`, { sourcePublishedAt: `2026-10-${String(20 - Math.floor(i / 6)).padStart(2, "0")}T0${i % 6}:00:00.000Z` })));
+    await importedSource("https://mix-two.test/", Array.from({ length: 8 }, (_, i) => product(`m2-${i}`, `Two Top ${i}`, { sourcePublishedAt: `2026-09-0${1 + (i % 8)}T00:00:00.000Z` })));
+    for (const u of ["https://mix-one.test/", "https://mix-two.test/"]) assert.ok((await followSource(D, { url: u })).ok);
+    const seen: string[] = [];
+    for (let page = 1; page <= 10; page++) {
+      const r = await searchCatalog({ userId: D }, { page, limit: 5 });
+      seen.push(...r.items.map((i) => i.id));
+      assert.equal(r.total, 20);
+      if (!r.hasMore) break;
+    }
+    assert.equal(seen.length, 20, "all products reached through pagination");
+    assert.equal(new Set(seen).size, 20, "no product repeated across pages");
+    const brands = seen.map((id) => id.split(":")[0]);
+    const firstTen = brands.slice(0, 10);
+    assert.ok(firstTen.filter((b, i) => i && b === firstTen[i - 1]).length <= 2, `early feed mixes brands: ${firstTen.join(" ")}`);
+    // Following just one brand: plain newest-first order.
+    await unfollow(D, "mix-two");
+    const solo = await searchCatalog({ userId: D }, { limit: 12 });
+    const dates = solo.items.map((i) => i.releasedAt!);
+    assert.equal(solo.items.length, 12);
+    assert.ok(dates.every((d, i) => !i || dates[i - 1] >= d), "single brand: plain newest-first order");
+    // Explicit sorts are never reshuffled.
+    const byPrice = await searchCatalog({ userId: D }, { sort: "price_asc", limit: 12 });
+    assert.ok(byPrice.items.every((p, i, a) => !i || (a[i - 1].price ?? 0) <= (p.price ?? 0)), "price sort intact");
+  });
+});
+
 describe("ingestion semantics on Postgres", () => {
   test("re-import dedupes; partial runs never remove; complete runs hide (not delete) missing products", async () => {
     const s = (await pg.query<SourceRow>("select * from sources where id = 'brand-y'")).rows[0];

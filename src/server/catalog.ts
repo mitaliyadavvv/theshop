@@ -4,9 +4,12 @@ import { CATEGORIES } from "@/lib/categories";
 import { dropCutoff } from "@/lib/dates";
 import { inferCategory } from "./ingest/normalize";
 import { checkRateLimit } from "./rate-limit";
+import { diversify } from "@/lib/diversify";
 import type { CatalogQuery, CatalogResult, CollectionDTO, ProductDTO, SortKey } from "@/lib/types";
 
 const MAX_LIMIT = 96;
+/** Upper bound on the ranked id list that brand mixing works over (far above today's catalogue). */
+const MIX_CAP = 5000;
 /** Signed-out visitors get a preview: this many pages of the public-preview brands. */
 export const PREVIEW_PAGES = 2;
 export const newDropDays = () => Number(process.env.NEW_DROP_DAYS ?? 14);
@@ -107,16 +110,12 @@ export async function searchCatalogAs(q: Queryable, viewer: Viewer, query: Catal
   const sort: SortKey = query.sort ?? (tsq ? "relevance" : "newest");
   const effectiveSort: SortKey = sort === "relevance" && !tsq ? "newest" : sort;
 
-  const P = new Params();
-  const where = buildWhere(query, viewer, P, tsq, null);
-  const rank = tsq ? `ts_rank(p.search, to_tsquery('english', ${P.add(tsq)}))` : "0";
-  const lim = P.add(limit), off = P.add((page - 1) * limit);
+  // Soft brand mixing for the browse feed (newest / best match). Explicit sorts (price, brand),
+  // Saved and New drops keep their exact order.
+  const mix = (effectiveSort === "newest" || effectiveSort === "relevance") && !query.savedOnly && !query.drop;
+
   const PC = new Params(), PB = new Params();
-  // Independent queries are sent together: one transaction, no waiting between them.
-  const [rows, catRows, brandCounts, priceRows] = await Promise.all([
-    q.query<Row & { total: number }>(
-      `select ${SELECT}, (s.id is not null) saved, ${rank} rank, count(*) over()::int total
-         ${fromSql(viewer)} ${where} order by ${ORDER[effectiveSort]} limit ${lim} offset ${off}`, P.values),
+  const facetQueries = [
     // Facets: each dimension counted with every *other* filter applied.
     q.query<{ category: string; n: number }>(
       `select p.category, count(*)::int n ${fromSql(viewer)} ${buildWhere(query, viewer, PC, tsq, "category")} group by p.category`, PC.values),
@@ -125,11 +124,49 @@ export async function searchCatalogAs(q: Queryable, viewer: Viewer, query: Catal
     q.query<{ min: number | null; max: number | null }>(
       `select min(p.price) min, max(p.price) max from products p join sources b on b.id = p.source_id
         where ${scopeSql(viewer)} and p.removed_at is null and p.price is not null ${demoOn() ? "" : "and not p.is_demo"}`),
-  ]);
-  let total = rows[0]?.total ?? 0;
-  if (!rows.length && page > 1) {
-    const C = new Params();
-    total = (await q.query<{ n: number }>(`select count(*)::int n ${fromSql(viewer)} ${buildWhere(query, viewer, C, tsq, null)}`, C.values))[0].n;
+  ] as const;
+
+  let rows: (Row & { total?: number })[];
+  let total: number;
+  let catRows: { category: string; n: number }[], brandCounts: { id: string; name: string; n: number }[], priceRows: { min: number | null; max: number | null }[];
+  if (mix) {
+    // 1) The whole ranked result as ids only (cheap), 2) mix it, 3) fetch just this page by id.
+    // Mixing the full list (not just one page) keeps pagination a stable slice: no repeats, no jumps.
+    const R = new Params();
+    const whereR = buildWhere(query, viewer, R, tsq, null);
+    const rankR = tsq ? `ts_rank(p.search, to_tsquery('english', ${R.add(tsq)}))` : "0";
+    const [ranked, c, b, pr] = await Promise.all([
+      q.query<{ id: string; source_id: string }>(
+        `select p.id, p.source_id, ${rankR} rank ${fromSql(viewer)} ${whereR} order by ${ORDER[effectiveSort]}, p.id limit ${MIX_CAP}`, R.values),
+      ...facetQueries,
+    ]);
+    [catRows, brandCounts, priceRows] = [c, b, pr];
+    const order = diversify(ranked.map((r) => ({ id: r.id, brand: r.source_id })), { weight: effectiveSort === "relevance" ? 0.75 : 0.5 });
+    total = order.length;
+    const pageIds = order.slice((page - 1) * limit, page * limit).map((o) => o.id);
+    const fetched = pageIds.length
+      ? await q.query<Row>(`select ${SELECT}, (s.id is not null) saved ${fromSql(viewer)} where p.id = any($1::text[]) and ${scopeSql(viewer)}`, [pageIds])
+      : [];
+    const pos = new Map(pageIds.map((id, i) => [id, i]));
+    rows = fetched.sort((a, b) => pos.get(a.id)! - pos.get(b.id)!);
+  } else {
+    const P = new Params();
+    const where = buildWhere(query, viewer, P, tsq, null);
+    const rank = tsq ? `ts_rank(p.search, to_tsquery('english', ${P.add(tsq)}))` : "0";
+    const lim = P.add(limit), off = P.add((page - 1) * limit);
+    // Independent queries are sent together: one transaction, no waiting between them.
+    const [r, c, b, pr] = await Promise.all([
+      q.query<Row & { total: number }>(
+        `select ${SELECT}, (s.id is not null) saved, ${rank} rank, count(*) over()::int total
+           ${fromSql(viewer)} ${where} order by ${ORDER[effectiveSort]} limit ${lim} offset ${off}`, P.values),
+      ...facetQueries,
+    ]);
+    [rows, catRows, brandCounts, priceRows] = [r, c, b, pr];
+    total = r[0]?.total ?? 0;
+    if (!r.length && page > 1) {
+      const C = new Params();
+      total = (await q.query<{ n: number }>(`select count(*)::int n ${fromSql(viewer)} ${buildWhere(query, viewer, C, tsq, null)}`, C.values))[0].n;
+    }
   }
   const catCounts = new Map(catRows.map((r) => [r.category, r.n]));
   const price = priceRows[0];

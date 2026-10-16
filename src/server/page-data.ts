@@ -37,10 +37,12 @@ async function dropsBundle(viewer: Viewer, query: CatalogQuery) {
  * these results (and RLS for `anon` excludes private data anyway). Signed-in pages are never cached.
  */
 const PUBLIC_TTL_SECONDS = 300;
+// Bump the -vN keys whenever the shape or ORDER of these results changes (v2: brand mixing),
+// so a deploy never serves entries computed by the previous version.
 const publicHome = unstable_cache((queryKey: string) => homeBundle(null, JSON.parse(queryKey)),
-  ["public-home-v1"], { revalidate: PUBLIC_TTL_SECONDS, tags: ["public-catalog"] });
+  ["public-home-v2"], { revalidate: PUBLIC_TTL_SECONDS, tags: ["public-catalog"] });
 const publicDrops = unstable_cache((queryKey: string) => dropsBundle(null, JSON.parse(queryKey)),
-  ["public-drops-v1"], { revalidate: PUBLIC_TTL_SECONDS, tags: ["public-catalog"] });
+  ["public-drops-v2"], { revalidate: PUBLIC_TTL_SECONDS, tags: ["public-catalog"] });
 
 /** Stable cache key: the same filters in any order hit the same entry. */
 const keyOf = (query: CatalogQuery) => JSON.stringify(query, Object.keys(query).sort());
@@ -61,5 +63,5 @@ export const savedPageData = (viewer: NonNullable<Viewer>, query: CatalogQuery) 
 
 /** Public product API for signed-out visitors (same cache rules as above). */
 export const publicSearch = unstable_cache((queryKey: string) => withViewer(null, (q) => searchCatalogAs(q, null, JSON.parse(queryKey))),
-  ["public-search-v1"], { revalidate: PUBLIC_TTL_SECONDS, tags: ["public-catalog"] });
+  ["public-search-v2"], { revalidate: PUBLIC_TTL_SECONDS, tags: ["public-catalog"] });
 export { keyOf as catalogCacheKey };
