@@ -32,7 +32,7 @@ export function getDb(): Db {
   if (!url) throw new Error("DATABASE_URL is not set. See .env.example and docs/DEPLOY.md.");
   const sql = postgres(url, {
     prepare: false,            // required for Supabase's transaction pooler (port 6543)
-    max: Number(process.env.DB_POOL_MAX) || (process.env.VERCEL ? 1 : 5),
+    max: Number(process.env.DB_POOL_MAX) || (process.env.VERCEL ? 3 : 5),   // layout + page can query in parallel
     idle_timeout: 20,
     types: { bigint: postgres.BigInt },
     transform: { undefined: null },
@@ -53,14 +53,11 @@ export type Viewer = { userId: string } | null;
  */
 export function withViewer<T>(viewer: Viewer, fn: (q: Queryable) => Promise<T>): Promise<T> {
   return getDb().tx(async (q) => {
-    if (viewer) {
-      if (!/^[0-9a-f-]{36}$/i.test(viewer.userId)) throw new Error("Invalid user id");
-      await q.query("set local role authenticated");
-      await q.query("select set_config('request.jwt.claims', $1, true)", [JSON.stringify({ sub: viewer.userId, role: "authenticated" })]);
-    } else {
-      await q.query("set local role anon");
-      await q.query("select set_config('request.jwt.claims', $1, true)", [JSON.stringify({ role: "anon" })]);
-    }
+    if (viewer && !/^[0-9a-f-]{36}$/i.test(viewer.userId)) throw new Error("Invalid user id");
+    // One round trip: set_config('role', …, true) is SET LOCAL ROLE (what Supabase's API does).
+    const role = viewer ? "authenticated" : "anon";
+    await q.query("select set_config('role', $1, true), set_config('request.jwt.claims', $2, true)",
+      [role, JSON.stringify(viewer ? { sub: viewer.userId, role } : { role })]);
     return fn(q);
   });
 }

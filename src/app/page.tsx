@@ -3,7 +3,8 @@ import { Hero } from "@/components/Hero";
 import { Catalogue } from "@/components/Catalogue";
 import { Suggestions } from "@/components/Suggestions";
 import { AddBrandForm } from "@/components/AddBrandForm";
-import { brandOptions, categoryOptions, heroProducts, heroStats, newDropDays, searchCatalog } from "@/server/catalog";
+import { newDropDays } from "@/server/catalog";
+import { homePageData } from "@/server/page-data";
 import { parseCatalogQuery } from "@/server/query-params";
 import { getViewer } from "@/server/auth";
 import { suggestions } from "@/server/sources-dto";
@@ -14,9 +15,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<Rec
   const viewer = await getViewer();
   const query = parseCatalogQuery(await searchParams);
   query.page = 1;
-  const [initial, stats, photos, categories, brands] = await Promise.all([
-    searchCatalog(viewer, query), heroStats(viewer), heroProducts(viewer, 6), categoryOptions(viewer), brandOptions(viewer),
-  ]);
+  const { initial, stats, photos, categories, brands } = await homePageData(viewer, query);
   const noBrands = !!viewer && stats.brands === 0;
   return (
     <>

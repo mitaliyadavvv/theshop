@@ -42,7 +42,7 @@ export function Hero({ photos, stats }: { photos: ProductDTO[]; stats: Stats }) 
               <a key={p.id} href={p.url} target="_blank" rel="noopener noreferrer" className="hero__photo"
                 style={{ ...slot.pos, width: slot.w, aspectRatio: "3 / 4", ["--fx" as string]: slot.fx, ["--fy" as string]: slot.fy, ["--d" as string]: `${slot.d}ms` }}
                 aria-label={`${p.name} by ${p.brandName}`}>
-                <img src={imageAt(p.imageUrl, 400)!} alt="" loading="eager" />
+                <img src={imageAt(p.imageUrl, 400)!} alt="" loading="eager" decoding="async" fetchPriority={i < 2 ? "high" : "auto"} />
                 <figcaption>{p.brandName}</figcaption>
               </a>
             );

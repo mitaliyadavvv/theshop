@@ -3,6 +3,8 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { supabaseBrowser } from "@/lib/supabase/client";
+import { authOrigin } from "@/lib/site-url";
+import { safeNextPath } from "@/lib/safe-next";
 
 type Mode = "login" | "signup" | "forgot" | "reset";
 
@@ -15,7 +17,7 @@ const COPY: Record<Mode, { title: string; cta: string; busy: string }> = {
 
 /** Only allow same-site relative redirects after auth (no open redirects). */
 export function safeNext(next: string | null | undefined) {
-  return next && next.startsWith("/") && !next.startsWith("//") ? next : "/";
+  return safeNextPath(next);
 }
 
 export function AuthForm({ mode, next }: { mode: Mode; next?: string }) {
@@ -30,7 +32,7 @@ export function AuthForm({ mode, next }: { mode: Mode; next?: string }) {
     e.preventDefault();
     setState({ kind: "busy" });
     const supabase = supabaseBrowser();
-    const origin = window.location.origin;
+    const origin = authOrigin();
     try {
       if (mode === "login") {
         const { error } = await supabase.auth.signInWithPassword({ email, password });

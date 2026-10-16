@@ -10,7 +10,7 @@ type WooPrices = {
 type WooProduct = {
   id: number; name: string; slug: string; permalink: string; type: string;
   short_description: string; description: string; on_sale: boolean;
-  prices: WooPrices; images: { src: string; thumbnail?: string }[];
+  prices: WooPrices; images: { src: string; thumbnail?: string; srcset?: string }[];
   categories: { name: string }[]; tags: { name: string }[];
   is_in_stock: boolean; is_purchasable: boolean;
 };
@@ -22,6 +22,18 @@ const minor = (v: string | undefined, unit: number) => {
   const n = toNumber(v);
   return n == null ? null : n / 10 ** unit;
 };
+
+/**
+ * Grid-sized image: the smallest WordPress-generated variant at least `min` px wide (from
+ * the Store API's srcset). The full-size `src` is often a 2,560 px, ~600 KB original.
+ */
+export function gridImage(img: { src: string; srcset?: string }, min = 600): string {
+  const candidates = (img.srcset ?? "").split(",").map((c) => c.trim().split(/\s+/))
+    .map(([url, w]) => ({ url, w: Number(w?.replace(/w$/, "")) }))
+    .filter((c) => c.url && Number.isFinite(c.w) && c.w >= min)
+    .sort((a, b) => a.w - b.w);
+  return candidates[0]?.url ?? img.src;
+}
 
 export function normalizeWooProduct(p: WooProduct): NormalizedProduct {
   const unit = p.prices?.currency_minor_unit ?? 2;
@@ -37,7 +49,7 @@ export function normalizeWooProduct(p: WooProduct): NormalizedProduct {
     sourceCategory: p.categories?.map((c) => decodeEntities(c.name)).join(", ") || null,
     tags: [...(p.categories ?? []), ...(p.tags ?? [])].map((t) => decodeEntities(t.name)),
     vendor: null,
-    imageUrl: images[0] ?? null,
+    imageUrl: p.images?.[0] ? gridImage(p.images[0]) : null,   // full-size originals stay in imageUrls
     imageUrls: images.slice(0, 8),
     url: p.permalink,
     price,

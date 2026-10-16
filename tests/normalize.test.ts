@@ -2,9 +2,10 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { inferCategory, isExcludedProduct, releaseDate, stripHtml } from "../src/server/ingest/normalize";
 import { parseSourceUrl } from "../src/server/url";
+import { safeNextPath } from "../src/lib/safe-next";
 import { toTsQuery } from "../src/server/catalog";
 import { normalizeShopifyProduct } from "../src/server/ingest/adapters/shopify";
-import { normalizeWooProduct } from "../src/server/ingest/adapters/woocommerce";
+import { normalizeWooProduct, gridImage } from "../src/server/ingest/adapters/woocommerce";
 
 const cat = (name: string, productType: string | null = null, tags: string[] = []) => inferCategory({ name, productType, tags }).category;
 
@@ -84,3 +85,18 @@ test("Woo normaliser: minor units, no dates", () => {
 });
 
 test("stripHtml", () => assert.equal(stripHtml("<p>a</p><p>b &amp; c</p>"), "a\nb & c"));
+
+test("Woo grid image: smallest srcset variant ≥ 600px, else the original", () => {
+  const srcset = "https://x.test/a-2035.jpg 2035w, https://x.test/a-239.jpg 239w, https://x.test/a-814.jpg 814w, https://x.test/a-600.jpg 600w";
+  assert.equal(gridImage({ src: "https://x.test/a.jpg", srcset }), "https://x.test/a-600.jpg");
+  assert.equal(gridImage({ src: "https://x.test/a.jpg" }), "https://x.test/a.jpg");
+  assert.equal(gridImage({ src: "https://x.test/a.jpg", srcset: "https://x.test/a-239.jpg 239w" }), "https://x.test/a.jpg");
+});
+
+test("post-auth redirects stay on this site (no open redirect)", () => {
+  for (const ok of ["/", "/brands", "/account/reset-password", "/?q=linen%20tops"]) assert.equal(safeNextPath(ok), ok);
+  for (const bad of ["//evil.example", "/\\evil.example", "/\\/evil.example", "https://evil.example", "evil.example", "/\tevil", "", null, undefined]) {
+    assert.equal(safeNextPath(bad as string), "/", String(bad));
+  }
+  assert.equal(safeNextPath("//evil.example", "/account/reset-password"), "/account/reset-password");
+});

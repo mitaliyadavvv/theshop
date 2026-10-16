@@ -1,4 +1,5 @@
 import "server-only";
+import { revalidateTag } from "next/cache";
 import { getDb, type Queryable } from "../db";
 import { ADAPTERS, adapterFor } from "./adapters";
 import { getText } from "./http";
@@ -232,6 +233,11 @@ export async function syncSource(sourceId: string, trigger: SyncTrigger): Promis
       status, products_seen: counts.seen, products_new: counts.created, products_updated: counts.updated,
       products_removed: counts.removed, requests: result.requests, warnings: JSON.stringify(warnings),
     });
+    // Signed-out visitors see a cached preview of public_preview brands: refresh it now
+    // rather than waiting for the 5-minute TTL. (No-op outside a Next.js request, e.g. CLI scripts.)
+    if (current.public_preview) {
+      try { revalidateTag("public-catalog", { expire: 0 }); } catch { /* not running inside Next.js */ }
+    }
     return { status, message: `${counts.seen} products (${counts.created} new, ${counts.removed} removed).`, runId };
   } catch (e) {
     const err = e instanceof SourceError ? e : new SourceError((e as Error).message ?? String(e), "network");

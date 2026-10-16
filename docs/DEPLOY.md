@@ -26,15 +26,20 @@ Commands run from the `the-shop/` folder.
    npm run db:migrate
    ```
    This applies `supabase/migrations/*.sql` once each and records them in a private `shop_private` schema. Instead, you can paste the SQL file into the Supabase **SQL Editor**, or run `supabase db push` if you use the Supabase CLI.
-5. **Auth settings** (Authentication → **URL Configuration**):
-   - Site URL: your production URL, for example `https://the-shop.vercel.app`. Use `http://localhost:3100` until you have one.
-   - Redirect URLs: add
-     - `http://localhost:3100/**`
+5. **Auth settings** (Authentication → **URL Configuration**). Use your **public production domain** from Vercel → Settings → **Domains**. Don't use a per-deployment URL (`theshop-abc123-you.vercel.app`, which is what the dashboard's "Visit" button opens) or the `-you.vercel.app` team alias: both sit behind Vercel Deployment Protection, so email links to them show Vercel's login page.
+   - **Site URL:** `https://YOUR-PRODUCTION-DOMAIN`
+   - **Redirect URLs:** add
      - `https://YOUR-PRODUCTION-DOMAIN/**`
-     - `https://*-YOUR-VERCEL-TEAM.vercel.app/**` (preview deployments, optional)
-6. **Email.** Email/password sign-up is on by default, with "Confirm email" enabled. Supabase's built-in email sender is heavily rate-limited (a handful per hour), so before you launch publicly, set up custom SMTP (Authentication → **Emails** → SMTP, e.g. Resend or Postmark).
-   - The default templates work as they are: links go to `/auth/callback` (PKCE), so they must be opened in the same browser.
-   - To make links work across devices, change the templates' links to `{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=email` (signup) or `…&type=recovery&next=/account/reset-password` (reset). `/auth/confirm` is already implemented.
+     - `http://localhost:3100/**` (local development)
+   - In Vercel, set **`NEXT_PUBLIC_SITE_URL=https://YOUR-PRODUCTION-DOMAIN`** and redeploy. Sign-up and password-reset emails then always link to that domain, whichever URL the user signed up on.
+6. **Email templates** (Authentication → **Emails** → Templates). Recommended: links that work in any browser, including the Gmail app.
+   - **Confirm signup:** change the link to
+     `<a href="{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=email">Confirm your email</a>`
+   - **Reset password:** change the link to
+     `<a href="{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=recovery&next=/account/reset-password">Reset your password</a>`
+   - If you keep the default `{{ .ConfirmationURL }}`, links go through `/auth/callback`. That still works, but only when the link is opened in the same browser the user signed up in.
+   - Either way, a successful confirmation lands on the shop with an "email confirmed" banner. A failed or expired link lands on the sign-in page with an explanation.
+   - Keep "Confirm email" enabled. Supabase's built-in email sender is heavily rate-limited, so before launch set up custom SMTP (Authentication → **Emails** → SMTP, e.g. Resend or Postmark).
 7. Optional hardening. The app only uses Supabase's Data API for auth. You can leave the API enabled: RLS and grants protect every table, and the tests prove it. Or you can restrict it under Project Settings → Data API.
 
 ## 2. Move your existing data in (safe, repeatable)

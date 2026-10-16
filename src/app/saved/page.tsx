@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { Catalogue } from "@/components/Catalogue";
-import { brandOptions, categoryOptions, newDropDays, searchCatalog } from "@/server/catalog";
+import { newDropDays } from "@/server/catalog";
+import { savedPageData } from "@/server/page-data";
 import { parseCatalogQuery } from "@/server/query-params";
 import { getViewer } from "@/server/auth";
 
@@ -11,7 +12,7 @@ export default async function SavedPage({ searchParams }: { searchParams: Promis
   const viewer = await getViewer();
   if (!viewer) redirect("/login?next=/saved");
   const query = { ...parseCatalogQuery(await searchParams), savedOnly: true, page: 1 };
-  const [initial, categories, brands] = await Promise.all([searchCatalog(viewer, query), categoryOptions(viewer), brandOptions(viewer)]);
+  const { initial, categories, brands } = await savedPageData(viewer, query);
   return (
     <div className="wrap" style={{ paddingBottom: 96 }}>
       <div className="page-head">

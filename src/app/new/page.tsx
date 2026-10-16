@@ -1,5 +1,6 @@
 import { NewDrops } from "@/components/NewDrops";
-import { brandOptions, categoryOptions, newDropDays, recentCollections, searchCatalog } from "@/server/catalog";
+import { newDropDays } from "@/server/catalog";
+import { dropsPageData } from "@/server/page-data";
 import { parseCatalogQuery } from "@/server/query-params";
 import { getViewer } from "@/server/auth";
 import { dropCutoff } from "@/lib/dates";
@@ -14,9 +15,7 @@ export default async function NewPage({ searchParams }: { searchParams: Promise<
   const win: DropWindow = parsed.drop ?? "week";
   const query = { ...parsed, drop: win, sort: parsed.sort ?? ("newest" as const), page: 1 };
   const cutoffs = Object.fromEntries((["today", "week", "month", "recent"] as DropWindow[]).map((w) => [w, dropCutoff(w).toISOString()])) as Record<DropWindow, string>;
-  const [initial, collections, categories, brands] = await Promise.all([
-    searchCatalog(viewer, query), recentCollections(viewer, "recent", 40), categoryOptions(viewer), brandOptions(viewer),
-  ]);
+  const { initial, collections, categories, brands } = await dropsPageData(viewer, query);
   return (
     <div className="wrap" style={{ paddingBottom: 96 }}>
       <div className="page-head">

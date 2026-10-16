@@ -111,26 +111,28 @@ export async function searchCatalogAs(q: Queryable, viewer: Viewer, query: Catal
   const where = buildWhere(query, viewer, P, tsq, null);
   const rank = tsq ? `ts_rank(p.search, to_tsquery('english', ${P.add(tsq)}))` : "0";
   const lim = P.add(limit), off = P.add((page - 1) * limit);
-  const rows = await q.query<Row & { total: number }>(
-    `select ${SELECT}, (s.id is not null) saved, ${rank} rank, count(*) over()::int total
-       ${fromSql(viewer)} ${where} order by ${ORDER[effectiveSort]} limit ${lim} offset ${off}`, P.values);
+  const PC = new Params(), PB = new Params();
+  // Independent queries are sent together: one transaction, no waiting between them.
+  const [rows, catRows, brandCounts, priceRows] = await Promise.all([
+    q.query<Row & { total: number }>(
+      `select ${SELECT}, (s.id is not null) saved, ${rank} rank, count(*) over()::int total
+         ${fromSql(viewer)} ${where} order by ${ORDER[effectiveSort]} limit ${lim} offset ${off}`, P.values),
+    // Facets: each dimension counted with every *other* filter applied.
+    q.query<{ category: string; n: number }>(
+      `select p.category, count(*)::int n ${fromSql(viewer)} ${buildWhere(query, viewer, PC, tsq, "category")} group by p.category`, PC.values),
+    q.query<{ id: string; name: string; n: number }>(
+      `select b.id, b.name, count(*)::int n ${fromSql(viewer)} ${buildWhere(query, viewer, PB, tsq, "brand")} group by b.id, b.name order by b.name`, PB.values),
+    q.query<{ min: number | null; max: number | null }>(
+      `select min(p.price) min, max(p.price) max from products p join sources b on b.id = p.source_id
+        where ${scopeSql(viewer)} and p.removed_at is null and p.price is not null ${demoOn() ? "" : "and not p.is_demo"}`),
+  ]);
   let total = rows[0]?.total ?? 0;
   if (!rows.length && page > 1) {
     const C = new Params();
     total = (await q.query<{ n: number }>(`select count(*)::int n ${fromSql(viewer)} ${buildWhere(query, viewer, C, tsq, null)}`, C.values))[0].n;
   }
-
-  // Facets: each dimension counted with every *other* filter applied.
-  const PC = new Params();
-  const catCounts = new Map((await q.query<{ category: string; n: number }>(
-    `select p.category, count(*)::int n ${fromSql(viewer)} ${buildWhere(query, viewer, PC, tsq, "category")} group by p.category`, PC.values,
-  )).map((r) => [r.category, r.n]));
-  const PB = new Params();
-  const brandCounts = await q.query<{ id: string; name: string; n: number }>(
-    `select b.id, b.name, count(*)::int n ${fromSql(viewer)} ${buildWhere(query, viewer, PB, tsq, "brand")} group by b.id, b.name order by b.name`, PB.values);
-  const price = (await q.query<{ min: number | null; max: number | null }>(
-    `select min(p.price) min, max(p.price) max from products p join sources b on b.id = p.source_id
-      where ${scopeSql(viewer)} and p.removed_at is null and p.price is not null ${demoOn() ? "" : "and not p.is_demo"}`))[0];
+  const catCounts = new Map(catRows.map((r) => [r.category, r.n]));
+  const price = priceRows[0];
 
   const newCutoff = Date.now() - newDropDays() * 86400_000;
   const maxPage = viewer ? Infinity : PREVIEW_PAGES;
@@ -150,42 +152,47 @@ export async function searchCatalogAs(q: Queryable, viewer: Viewer, query: Catal
 export const searchCatalog = (viewer: Viewer, query: CatalogQuery) => withViewer(viewer, (q) => searchCatalogAs(q, viewer, query));
 
 /** Brands for the "From [brand]" picker: the viewer's own brands (or the preview set). */
-export function brandOptions(viewer: Viewer) {
-  return withViewer(viewer, (q) => q.query<{ id: string; label: string; count: number }>(
+export const brandOptions = (viewer: Viewer) => withViewer(viewer, (q) => brandOptionsAs(q, viewer));
+export function brandOptionsAs(q: Queryable, viewer: Viewer) {
+  return q.query<{ id: string; label: string; count: number }>(
     `select b.id, b.name label, count(p.id)::int count from sources b
        left join products p on p.source_id = b.id and p.removed_at is null ${demoOn() ? "" : "and not p.is_demo"}
       where ${viewer ? "b.id in (select source_id from user_subscriptions)" : "b.public_preview"}
-      group by b.id, b.name order by b.name`));
+      group by b.id, b.name order by b.name`);
 }
 
-export async function categoryOptions(viewer: Viewer) {
-  const rows = await withViewer(viewer, (q) => q.query<{ category: string; n: number }>(
+export const categoryOptions = (viewer: Viewer) => withViewer(viewer, (q) => categoryOptionsAs(q, viewer));
+export async function categoryOptionsAs(q: Queryable, viewer: Viewer) {
+  const rows = await q.query<{ category: string; n: number }>(
     `select p.category, count(*)::int n from products p join sources b on b.id = p.source_id
-      where ${scopeSql(viewer)} and p.removed_at is null ${demoOn() ? "" : "and not p.is_demo"} group by p.category`));
+      where ${scopeSql(viewer)} and p.removed_at is null ${demoOn() ? "" : "and not p.is_demo"} group by p.category`);
   const counts = new Map(rows.map((r) => [r.category, r.n]));
   return CATEGORIES.filter((c) => counts.has(c.id)).map((c) => ({ id: c.id, label: c.label, count: counts.get(c.id)! }));
 }
 
 /** Recently published collections (source-reported dates only) from the viewer's brands. */
-export async function recentCollections(viewer: Viewer, window: string, limit = 12): Promise<CollectionDTO[]> {
-  const rows = await withViewer(viewer, (q) => q.query<{ id: string; title: string; url: string; image_url: string | null;
+export const recentCollections = (viewer: Viewer, window: string, limit = 12) =>
+  withViewer(viewer, (q) => recentCollectionsAs(q, viewer, window, limit));
+export async function recentCollectionsAs(q: Queryable, viewer: Viewer, window: string, limit = 12): Promise<CollectionDTO[]> {
+  const rows = await q.query<{ id: string; title: string; url: string; image_url: string | null;
       products_count: number | null; published_at: Date; source_id: string; brand_name: string }>(
     `select c.*, b.name brand_name from collections c join sources b on b.id = c.source_id
       where ${viewer ? "b.id in (select source_id from user_subscriptions)" : "b.public_preview"}
         and c.published_at is not null and c.published_at >= $1 and (c.products_count is null or c.products_count > 0)
         and c.handle not in ('all','frontpage','home','shop-all','new-arrivals','new-in','bestsellers','best-sellers','sale')
-      order by c.published_at desc limit $2`, [dropCutoff(window).toISOString(), limit]));
+      order by c.published_at desc limit $2`, [dropCutoff(window).toISOString(), limit]);
   return rows.map((r) => ({ id: r.id, title: r.title, url: r.url, imageUrl: r.image_url, productsCount: r.products_count,
     publishedAt: iso(r.published_at)!, brandId: r.source_id, brandName: r.brand_name }));
 }
 
 /** A handful of recent real product images from different brands, for the hero collage. */
-export async function heroProducts(viewer: Viewer, n = 6): Promise<ProductDTO[]> {
+export const heroProducts = (viewer: Viewer, n = 6) => withViewer(viewer, (q) => heroProductsAs(q, viewer, n));
+export async function heroProductsAs(q: Queryable, viewer: Viewer, n = 6): Promise<ProductDTO[]> {
   const sql = (scope: string) => `select ${SELECT}, false saved from products p join sources b on b.id = p.source_id
       where ${scope} and p.removed_at is null and not p.is_demo and p.image_url is not null and p.owner_user_id is null
         and p.category in ('tops','dresses','skirts','coords','bottoms','outerwear')
       order by p.released_at desc nulls last limit 200`;
-  let pool = await withViewer(viewer, (q) => q.query<Row>(sql(scopeSql(viewer))));
+  let pool = await q.query<Row>(sql(scopeSql(viewer)));
   // A brand-new account with no brands yet still gets a collage, from the public preview set.
   if (!pool.length && viewer) pool = await withViewer(null, (q) => q.query<Row>(sql("b.public_preview")));
   const picked: Row[] = [];
@@ -198,16 +205,15 @@ export async function heroProducts(viewer: Viewer, n = 6): Promise<ProductDTO[]>
   return picked.map((r) => toDTO(r, 0));
 }
 
-export async function heroStats(viewer: Viewer) {
-  return withViewer(viewer, async (q) => {
-    const [r] = await q.query<{ products: number; brands: number; week: number }>(
-      `select count(*)::int products, count(distinct p.source_id)::int brands,
-              count(*) filter (where p.released_at >= now() - interval '7 days')::int week
-         from products p join sources b on b.id = p.source_id
-        where ${scopeSql(viewer)} and p.removed_at is null and not p.is_demo`);
-    const brands = viewer ? (await q.query<{ n: number }>("select count(*)::int n from user_subscriptions"))[0].n : r.brands;
-    return { products: r.products, brands, newThisWeek: r.week };
-  });
+export const heroStats = (viewer: Viewer) => withViewer(viewer, (q) => heroStatsAs(q, viewer));
+export async function heroStatsAs(q: Queryable, viewer: Viewer) {
+  const [r] = await q.query<{ products: number; brands: number; week: number }>(
+    `select count(*)::int products, count(distinct p.source_id)::int brands,
+            count(*) filter (where p.released_at >= now() - interval '7 days')::int week
+       from products p join sources b on b.id = p.source_id
+      where ${scopeSql(viewer)} and p.removed_at is null and not p.is_demo`);
+  const brands = viewer ? (await q.query<{ n: number }>("select count(*)::int n from user_subscriptions"))[0].n : r.brands;
+  return { products: r.products, brands, newThisWeek: r.week };
 }
 
 /* ---------------- Saved items (always as the user; RLS enforces ownership) ---------------- */
