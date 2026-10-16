@@ -22,7 +22,7 @@ export default async function NewPage({ searchParams }: { searchParams: Promise<
         <h1>New drops</h1>
         <p>
           {viewer ? "What your brands have released lately." : "What the preview brands have released lately."} Dates come from each
-          store’s own publish date. Where a store doesn’t publish dates, we use the day we first spotted a product — and nothing from
+          store’s own publish date. Where a store doesn’t publish dates, we use the day we first spotted a product, and nothing from
           our first import of a brand ever counts as new.
         </p>
       </div>

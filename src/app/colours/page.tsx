@@ -11,9 +11,9 @@ export default async function ColoursPage() {
   return (
     <div className="wrap" style={{ paddingBottom: 96 }}>
       <div className="page-head">
-        <h1>Colour Explorer</h1>
+        <h1>Find your shade</h1>
         <p>
-          {viewer ? "Your brands" : "The preview brands"}, arranged by shade — the spectrum runs across, light to dark runs down.
+          {viewer ? "Your brands" : "The preview brands"}, arranged by shade. The spectrum runs across, and light to dark runs down.
           Hover a piece to see it; click to open it on the brand’s own site.
         </p>
       </div>

@@ -42,7 +42,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         </SavedProvider>
         <footer className="footer">
           <div className="wrap">
-            <span>{site.name} — a personal discovery layer. Nothing is sold here; every product links to the brand’s own site.</span>
+            <span>{site.name} A personal discovery layer. Nothing is sold here; every product links to the brand’s own site.</span>
             <span>Prices and stock come from each brand and can change.</span>
           </div>
         </footer>

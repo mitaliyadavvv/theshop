@@ -14,7 +14,7 @@ export default async function BrandsPage() {
     <div className="wrap" style={{ paddingBottom: 96 }}>
       <div className="page-head">
         <h1>My brands</h1>
-        <p>The brands in your collection — only you can see this list. Each one syncs daily. Nothing here is guessed: if a brand can’t be read automatically, it says so.</p>
+        <p>The brands in your collection. Only you can see this list. Each one syncs daily. Nothing here is guessed: if a brand can’t be read automatically, it says so.</p>
       </div>
       <BrandsManager initial={mine} suggested={suggested} />
     </div>

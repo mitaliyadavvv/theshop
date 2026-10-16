@@ -219,7 +219,7 @@ h1, h2, h3 { font-weight: var(--fw-medium); letter-spacing: -0.02em; line-height
 }
 .hero__copy > * { pointer-events: auto; }
 .hero h1 { font-size: var(--fs-hero); font-weight: var(--fw-medium); letter-spacing: -0.035em; max-width: 12ch; margin: 0 auto; }
-.hero__sub { margin-top: var(--s-4); color: var(--ink-2); font-size: 0.9375rem; max-width: 38ch; margin-inline: auto; }
+.hero__sub { margin-top: var(--s-4); color: var(--ink-2); font-size: 0.9375rem; max-width: 38ch; margin-inline: auto; text-wrap: balance; }
 .hero__stats { margin-top: var(--s-5); display: flex; gap: var(--s-4); justify-content: center; flex-wrap: wrap; }
 .hero__stats span { display: inline-flex; align-items: center; gap: 6px; }
 .hero__stats i { width: 6px; height: 6px; display: inline-block; }
